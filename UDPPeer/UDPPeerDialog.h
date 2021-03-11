@@ -20,13 +20,10 @@ public:
 
 // Implementation
 protected:
-    void StartCollecting();
-
 	HICON m_hIcon;
 
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
-    afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
 	afx_msg void OnClose();
@@ -59,6 +56,17 @@ public:
 	BOOL GetIsListenPausing() const;
 
 	SOCKET collectSocket;
+	CWinThread* collector;
+	BOOL isCollecting;
+	BOOL isCollectPausing;
+	void Collect();
+	void PauseCollecting();
+	void ResumeCollecting();
+	void EndCollecting();
+	static UINT CollectThread(LPVOID pParam);
+	BOOL GetIsCollecting() const;
+	BOOL GetIsCollectPausing() const;
+
     CString receiveData;
     int portno;
     CEdit printEdit;
@@ -84,6 +92,13 @@ inline BOOL UDPPeerDialog::GetIsListening() const {
 }
 inline BOOL UDPPeerDialog::GetIsListenPausing() const {
 	return this->isListenPausing;
+}
+
+inline BOOL UDPPeerDialog::GetIsCollecting() const {
+	return this->isCollecting;
+}
+inline BOOL UDPPeerDialog::GetIsCollectPausing() const {
+	return this->isCollectPausing;
 }
 
 #endif //_UDPPEERDIALOG_H

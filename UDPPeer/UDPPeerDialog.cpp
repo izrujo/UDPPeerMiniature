@@ -50,6 +50,10 @@ UDPPeerDialog::UDPPeerDialog(CWnd* pParent /*=NULL*/)
 	this->isListening = FALSE;
 	this->isListenPausing = FALSE;
 
+	this->collector = NULL;
+	this->isCollecting = FALSE;
+	this->isCollectPausing = FALSE;
+
 	this->m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
 
@@ -66,7 +70,6 @@ BEGIN_MESSAGE_MAP(UDPPeerDialog, CDialog)
 	ON_WM_PAINT()
 	ON_WM_CLOSE()
 	ON_WM_QUERYDRAGICON()
-	ON_WM_TIMER()
 	//}}AFX_MSG_MAP
 	ON_BN_CLICKED(IDC_BUTTON_BROADCAST, &UDPPeerDialog::OnBroadcastButtonClicked)
 	ON_BN_CLICKED(IDC_BUTTON_COLLECT, &UDPPeerDialog::OnCollectButtonClicked)
@@ -175,6 +178,8 @@ void UDPPeerDialog::OnClose() {
 	this->listenSocket.ShutDown();
 	this->listenSocket.Close(); //서버 종료.
 
+	this->EndCollecting();
+
 	//5.2. 윈도우를 닫다.
 	CDialog::OnClose();
 }
@@ -200,9 +205,10 @@ void UDPPeerDialog::OnBroadcastButtonClicked()
 }
 
 void UDPPeerDialog::OnCollectButtonClicked() {
-	StartCollecting();
-	SetTimer(0x1, 100, NULL);
+	this->Collect();
+
 	GetDlgItem(IDC_BUTTON_COLLECT)->EnableWindow(FALSE);
+	GetDlgItem(IDC_BUTTON_CONNECT)->EnableWindow(FALSE);
 	GetDlgItem(IDC_EDIT_MESSAGE)->EnableWindow(FALSE);
 }
 
@@ -221,6 +227,9 @@ void UDPPeerDialog::OnSendButtonClicked()
 void UDPPeerDialog::OnConnectButtonClicked() {
 	//수신한 IP정보를 바탕으로 상대방 Peer에 접속을 요청하다.
 			//connectSocket connect ChatClientExample 참고
+
+	this->EndCollecting();
+
 	this->connectSocket.Create();
 	if (this->connectSocket.Connect(this->ipAddress, this->portno) == FALSE)
 	{
@@ -233,78 +242,6 @@ void UDPPeerDialog::OnConnectButtonClicked() {
 		GetDlgItem(IDC_BUTTON_SEND)->EnableWindow(TRUE);
 		GetDlgItem(IDC_EDIT_MESSAGE)->EnableWindow(TRUE);
 	}
-}
-
-void UDPPeerDialog::StartCollecting()
-{
-	UpdateData(TRUE);
-
-	this->collectSocket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (this->collectSocket == -1)
-	{
-		MessageBox("Error in creating socket");
-		return;
-	}
-
-	//struct hostent *hostentry = gethostbyname(m_serveraddr);
-	//char *pipaddr = inet_ntoa (*(struct in_addr *)*hostentry->h_addr_list);
-	//UDPserveraddr.sin_addr.s_addr = inet_addr(pipaddr);
-
-	SOCKADDR_IN UDPserveraddr;
-	memset(&UDPserveraddr, 0, sizeof(UDPserveraddr));
-	UDPserveraddr.sin_family = AF_INET;
-	UDPserveraddr.sin_port = htons(this->portno);
-	UDPserveraddr.sin_addr.s_addr = INADDR_ANY;
-
-	int len = sizeof(UDPserveraddr);
-
-	if (bind(this->collectSocket, (SOCKADDR*)&UDPserveraddr, sizeof(SOCKADDR_IN)) < 0)
-	{
-		MessageBox("ERROR binding in the server socket");
-		return;
-	}
-}
-
-void UDPPeerDialog::OnTimer(UINT_PTR nIDEvent)
-{
-	fd_set fds;
-	struct timeval timeout;
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 100;
-
-	FD_ZERO(&fds);
-	FD_SET(this->collectSocket, &fds);
-
-	int rc = select(sizeof(fds) * 8, &fds, NULL, NULL, &timeout);
-	if (rc > 0)
-	{
-		char rbuf[1024];
-		SOCKADDR_IN clientaddr;
-		int len = sizeof(clientaddr);
-		if (recvfrom(this->collectSocket, rbuf, 1024, 0, (sockaddr*)&clientaddr, &len) > 0)
-		{
-			for (int i = 1024; i >= 1; i--)
-			{
-				if (rbuf[i] == '\n' && rbuf[i - 1] == '\r')
-				{
-					rbuf[i - 1] = '\0';
-					break;
-				}
-			}
-			char* p = inet_ntoa(clientaddr.sin_addr);
-			int serverportno = ntohs(clientaddr.sin_port);
-			CString rData;
-
-			rData.Format("%s\r\nBroadcast Server- %s: %d \r\n%s\r\n\r\n", (const char*)CTime::GetCurrentTime().Format("%B %d, %Y %H:%M:%S"), p, serverportno, rbuf);
-
-			this->receiveData = rData + this->receiveData;
-			this->ipAddress = p;
-			this->portno = atoi(rbuf);
-
-			UpdateData(FALSE);
-		}
-	}
-	CDialog::OnTimer(nIDEvent);
 }
 
 void UDPPeerDialog::Broadcast() {
@@ -438,6 +375,110 @@ UINT UDPPeerDialog::ListenThread(LPVOID pParam) {
 		AfxMessageBox(_T("ERROR: Failed to create server socket!"));
 	}
 
+
+	return 0;
+}
+
+void UDPPeerDialog::Collect() {
+	this->isCollecting = TRUE;
+
+	this->UpdateData(TRUE);
+	this->collector = AfxBeginThread(CollectThread, (LPVOID)this);
+}
+
+void UDPPeerDialog::PauseCollecting() {
+	this->isCollecting = FALSE;
+	this->isCollectPausing = TRUE;
+	this->collector->SuspendThread();
+	this->UpdateData(FALSE);
+}
+
+void UDPPeerDialog::ResumeCollecting() {
+	this->isCollecting = TRUE;
+	this->isCollectPausing = FALSE;
+	this->collector->ResumeThread();
+}
+
+void UDPPeerDialog::EndCollecting() {
+	this->isCollecting = FALSE;
+	if (this->collector != NULL) {
+		if (this->isCollectPausing == TRUE) {
+			this->collector->ResumeThread();
+		}
+		::WaitForSingleObject(this->collector->m_hThread, INFINITE);
+
+	}
+	this->isCollectPausing = FALSE;
+	this->UpdateData(FALSE);
+}
+
+UINT UDPPeerDialog::CollectThread(LPVOID pParam) {
+	UDPPeerDialog* dlg = (UDPPeerDialog*)pParam;
+
+	dlg->collectSocket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (dlg->collectSocket == -1)
+	{
+		dlg->MessageBox("Error in creating socket");
+		
+	}
+
+	//struct hostent *hostentry = gethostbyname(m_serveraddr);
+	//char *pipaddr = inet_ntoa (*(struct in_addr *)*hostentry->h_addr_list);
+	//UDPserveraddr.sin_addr.s_addr = inet_addr(pipaddr);
+
+	SOCKADDR_IN UDPserveraddr;
+	memset(&UDPserveraddr, 0, sizeof(UDPserveraddr));
+	UDPserveraddr.sin_family = AF_INET;
+	UDPserveraddr.sin_port = htons(dlg->portno);
+	UDPserveraddr.sin_addr.s_addr = INADDR_ANY;
+
+	int len = sizeof(UDPserveraddr);
+
+	if (bind(dlg->collectSocket, (SOCKADDR*)&UDPserveraddr, sizeof(SOCKADDR_IN)) < 0)
+	{
+		dlg->MessageBox("ERROR binding in the server socket");
+		
+	}
+
+	while (dlg->isCollecting == TRUE) {
+		fd_set fds;
+		struct timeval timeout;
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 100;
+
+		FD_ZERO(&fds);
+		FD_SET(dlg->collectSocket, &fds);
+
+		int rc = select(sizeof(fds) * 8, &fds, NULL, NULL, &timeout);
+		if (rc > 0)
+		{
+			char rbuf[1024];
+			SOCKADDR_IN clientaddr;
+			int len = sizeof(clientaddr);
+			if (recvfrom(dlg->collectSocket, rbuf, 1024, 0, (sockaddr*)&clientaddr, &len) > 0)
+			{
+				for (int i = 1024; i >= 1; i--)
+				{
+					if (rbuf[i] == '\n' && rbuf[i - 1] == '\r')
+					{
+						rbuf[i - 1] = '\0';
+						break;
+					}
+				}
+				char* p = inet_ntoa(clientaddr.sin_addr);
+				int serverportno = ntohs(clientaddr.sin_port);
+				CString rData;
+
+				rData.Format("%s\r\nBroadcast Server- %s: %d \r\n%s\r\n\r\n", (const char*)CTime::GetCurrentTime().Format("%B %d, %Y %H:%M:%S"), p, serverportno, rbuf);
+
+				dlg->receiveData = rData + dlg->receiveData;
+				dlg->ipAddress = p;
+				dlg->portno = atoi(rbuf);
+
+				dlg->GetDlgItem(IDC_BUTTON_CONNECT)->EnableWindow(TRUE);
+			}
+		}
+	}
 
 	return 0;
 }

@@ -208,7 +208,12 @@ void UDPPeerDialog::OnSendButtonClicked()
 {
 	//4.1. 메시지를 가져오다.
 	((CEdit*)GetDlgItem(IDC_EDIT_MESSAGE))->GetWindowTextA(this->message);
+
 	//4.2. 메시지를 보내다. connectSocket에 send 하기 ChatClientExample 참고
+	this->connectSocket.Send((LPVOID)(LPCTSTR)this->message,
+		this->message.GetLength());
+
+	((CEdit*)GetDlgItem(IDC_EDIT_MESSAGE))->SetWindowTextA("");
 }
 
 void UDPPeerDialog::StartCollecting()
@@ -274,12 +279,12 @@ void UDPPeerDialog::OnTimer(UINT_PTR nIDEvent)
 			rData.Format("%s\r\nBroadcast Server: %s \r\n%s\r\n\r\n", (const char*)CTime::GetCurrentTime().Format("%B %d, %Y %H:%M:%S"), p, rbuf);
 
 			this->receiveData = rData + this->receiveData;
-			this->portno = serverportno;
+			this->portno = atoi(rbuf);
 
 			//수신한 IP정보를 바탕으로 상대방 Peer에 접속을 요청하다.
 			//connectSocket connect ChatClientExample 참고
 			this->connectSocket.Create();
-			if (this->connectSocket.Connect(_T(p), serverportno) == FALSE)
+			if (this->connectSocket.Connect(_T(p), this->portno) == FALSE)
 			{
 				AfxMessageBox(_T("ERROR: Failed to connect server"));
 				PostQuitMessage(0);
@@ -292,6 +297,7 @@ void UDPPeerDialog::OnTimer(UINT_PTR nIDEvent)
 			}
 
 			UpdateData(FALSE);
+
 		}
 	}
 	CDialog::OnTimer(nIDEvent);

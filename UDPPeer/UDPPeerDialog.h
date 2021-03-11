@@ -2,6 +2,8 @@
 #define _UDPPEERDIALOG_H
 
 #include "resource.h"
+#include "ConnectSocket.h"
+#include "ListenSocket.h"
 #include <afxwin.h>
 
 class UDPPeerDialog : public CDialog
@@ -18,7 +20,7 @@ public:
 
 // Implementation
 protected:
-    void StartListening();
+    void StartCollecting();
 
 	HICON m_hIcon;
 
@@ -27,17 +29,59 @@ protected:
     afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
+	afx_msg void OnClose();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
-    SOCKET m_connectSocket;
-    SOCKET m_listenSocket;
-    CString m_recvData;
-    CEdit m_editCtrl;
-    afx_msg void OnBnClickedOk();
+	SOCKET broadcastSocket;
+	CWinThread* broadcaster;
+	BOOL isBroadcasting;
+	BOOL isBroadcastPausing;
+	void Broadcast();
+	void PauseBroadcasting();
+	void ResumeBroadcasting();
+	void EndBroadcasting();
+	static UINT BroadcastThread(LPVOID pParam);
+	BOOL GetIsBroadcasting() const;
+	BOOL GetIsBroadcastPausing() const;
+    afx_msg void OnBroadcastButtonClicked();
+
+    ListenSocket listenSocket;
+	CWinThread* listener;
+	BOOL isListening;
+	BOOL isListenPausing;
+	void Listen();
+	void PauseListening();
+	void ResumeListening();
+	void EndListening();
+	static UINT ListenThread(LPVOID pParam);
+	BOOL GetIsListening() const;
+	BOOL GetIsListenPausing() const;
+
+	SOCKET collectSocket;
+    CString receiveData;
+    int portno;
+    CEdit printEdit;
+    afx_msg void OnCollectButtonClicked();
+
+    ConnectSocket connectSocket;
+	CString message;
 	afx_msg void OnSendButtonClicked();
-    int m_portno;
-	CString m_message;
+
 };
+
+inline BOOL UDPPeerDialog::GetIsBroadcasting() const {
+	return this->isBroadcasting;
+}
+inline BOOL UDPPeerDialog::GetIsBroadcastPausing() const {
+	return this->isBroadcastPausing;
+}
+
+inline BOOL UDPPeerDialog::GetIsListening() const {
+	return this->isListening;
+}
+inline BOOL UDPPeerDialog::GetIsListenPausing() const {
+	return this->isListenPausing;
+}
 
 #endif //_UDPPEERDIALOG_H

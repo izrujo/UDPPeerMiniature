@@ -141,11 +141,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="ClientSocket.h" />
+    <ClInclude Include="ConnectSocket.h" />
+    <ClInclude Include="ListenSocket.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="UDPPeerApp.h" />
     <ClInclude Include="UDPPeerDialog.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ClientSocket.cpp" />
+    <ClCompile Include="ConnectSocket.cpp" />
+    <ClCompile Include="ListenSocket.cpp" />
     <ClCompile Include="UDPPeerApp.cpp" />
     <ClCompile Include="UDPPeerDialog.cpp" />
   </ItemGroup>

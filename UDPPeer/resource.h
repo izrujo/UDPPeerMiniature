@@ -16,6 +16,7 @@
 #define IDC_BUTTON_SEND                 1006
 #define IDC_BUTTON_BROADCAST            1007
 #define IDC_BUTTON_COLLECT              1008
+#define IDC_BUTTON_CONNECT              1009
 
 // Next default values for new objects
 // 

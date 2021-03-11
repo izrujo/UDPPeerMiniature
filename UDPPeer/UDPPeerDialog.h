@@ -67,6 +67,8 @@ public:
     ConnectSocket connectSocket;
 	CString message;
 	afx_msg void OnSendButtonClicked();
+	CString ipAddress;
+	afx_msg void OnConnectButtonClicked();
 
 };
 

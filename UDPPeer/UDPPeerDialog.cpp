@@ -38,8 +38,9 @@ END_MESSAGE_MAP()
 UDPPeerDialog::UDPPeerDialog(CWnd* pParent /*=NULL*/)
 	: CDialog(IDD, pParent)
 	, receiveData(_T(""))
-	, portno(59583)
+	, portno(63527)
 	, message(_T(""))
+	, ipAddress(_T(""))
 {
 	this->broadcaster = NULL;
 	this->isBroadcasting = FALSE;
@@ -70,6 +71,7 @@ BEGIN_MESSAGE_MAP(UDPPeerDialog, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_BROADCAST, &UDPPeerDialog::OnBroadcastButtonClicked)
 	ON_BN_CLICKED(IDC_BUTTON_COLLECT, &UDPPeerDialog::OnCollectButtonClicked)
 	ON_BN_CLICKED(IDC_BUTTON_SEND, &UDPPeerDialog::OnSendButtonClicked)
+	ON_BN_CLICKED(IDC_BUTTON_CONNECT, &UDPPeerDialog::OnConnectButtonClicked)
 END_MESSAGE_MAP()
 
 
@@ -216,6 +218,23 @@ void UDPPeerDialog::OnSendButtonClicked()
 	((CEdit*)GetDlgItem(IDC_EDIT_MESSAGE))->SetWindowTextA("");
 }
 
+void UDPPeerDialog::OnConnectButtonClicked() {
+	//수신한 IP정보를 바탕으로 상대방 Peer에 접속을 요청하다.
+			//connectSocket connect ChatClientExample 참고
+	this->connectSocket.Create();
+	if (this->connectSocket.Connect(this->ipAddress, this->portno) == FALSE)
+	{
+		AfxMessageBox(_T("ERROR: Failed to connect server"));
+		PostQuitMessage(0);
+	}
+	else {
+		AfxMessageBox(_T("Connect Success\r\nReady to Send Message"));
+		//Send 버튼을 활성화하다.
+		GetDlgItem(IDC_BUTTON_SEND)->EnableWindow(TRUE);
+		GetDlgItem(IDC_EDIT_MESSAGE)->EnableWindow(TRUE);
+	}
+}
+
 void UDPPeerDialog::StartCollecting()
 {
 	UpdateData(TRUE);
@@ -276,28 +295,13 @@ void UDPPeerDialog::OnTimer(UINT_PTR nIDEvent)
 			int serverportno = ntohs(clientaddr.sin_port);
 			CString rData;
 
-			rData.Format("%s\r\nBroadcast Server: %s \r\n%s\r\n\r\n", (const char*)CTime::GetCurrentTime().Format("%B %d, %Y %H:%M:%S"), p, rbuf);
+			rData.Format("%s\r\nBroadcast Server- %s: %d \r\n%s\r\n\r\n", (const char*)CTime::GetCurrentTime().Format("%B %d, %Y %H:%M:%S"), p, serverportno, rbuf);
 
 			this->receiveData = rData + this->receiveData;
+			this->ipAddress = p;
 			this->portno = atoi(rbuf);
 
-			//수신한 IP정보를 바탕으로 상대방 Peer에 접속을 요청하다.
-			//connectSocket connect ChatClientExample 참고
-			this->connectSocket.Create();
-			if (this->connectSocket.Connect(_T(p), this->portno) == FALSE)
-			{
-				AfxMessageBox(_T("ERROR: Failed to connect server"));
-				PostQuitMessage(0);
-			}
-			else {
-				AfxMessageBox(_T("Connect Success\r\nReady to Send Message"));
-				//Send 버튼을 활성화하다.
-				GetDlgItem(IDC_BUTTON_SEND)->EnableWindow(TRUE);
-				GetDlgItem(IDC_EDIT_MESSAGE)->EnableWindow(TRUE);
-			}
-
 			UpdateData(FALSE);
-
 		}
 	}
 	CDialog::OnTimer(nIDEvent);
@@ -337,7 +341,7 @@ UINT UDPPeerDialog::BroadcastThread(LPVOID pParam) {
 	UDPPeerDialog* dlg = (UDPPeerDialog*)pParam;
 
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@자기 포트번호 넣는 곳@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	int myPortNumber = 59583;
+	int myPortNumber = 59765;
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@자기 포트번호 넣는 곳@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	int count = 0;
 	while (dlg->isBroadcasting == TRUE) {
@@ -360,7 +364,7 @@ UINT UDPPeerDialog::BroadcastThread(LPVOID pParam) {
 		int len = sizeof(brdcastaddr);
 
 		char sbuf[1024];
-		sprintf(sbuf, "%d\r\n", myPortNumber);
+		sprintf(sbuf, "%d", myPortNumber);
 		int ret = sendto(dlg->broadcastSocket, sbuf, strlen(sbuf), 0, (sockaddr*)&brdcastaddr, len);
 		if (count <= 0) {
 			if (ret < 0)
@@ -373,7 +377,9 @@ UINT UDPPeerDialog::BroadcastThread(LPVOID pParam) {
 			}
 			else
 			{
-				AfxMessageBox("Broadcasting is done");
+				CString msg;
+				msg.Format("Broadcasting is done by port %d", myPortNumber);
+				AfxMessageBox(msg);
 			}
 		}
 		::closesocket(dlg->broadcastSocket);

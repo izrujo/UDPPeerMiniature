@@ -38,7 +38,8 @@ END_MESSAGE_MAP()
 UDPPeerDialog::UDPPeerDialog(CWnd* pParent /*=NULL*/)
 	: CDialog(IDD, pParent)
 	, receiveData(_T(""))
-	, portno(63527)
+	, otherPortno(49867)
+	, myPortno(63379)
 	, message(_T(""))
 	, ipAddress(_T(""))
 {
@@ -62,13 +63,13 @@ void UDPPeerDialog::DoDataExchange(CDataExchange* pDX)
 	CDialog::DoDataExchange(pDX);
 	DDX_Text(pDX, IDC_EDIT_PRINT, this->receiveData);
 	DDX_Control(pDX, IDC_EDIT_PRINT, this->printEdit);
-	DDX_Text(pDX, IDC_STATIC_PORTNUMBER, this->portno);
+	DDX_Text(pDX, IDC_STATIC_PORTNUMBER, this->otherPortno);
 }
 
 BEGIN_MESSAGE_MAP(UDPPeerDialog, CDialog)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
-	ON_WM_CLOSE()
+	ON_WM_DESTROY()
 	ON_WM_QUERYDRAGICON()
 	//}}AFX_MSG_MAP
 	ON_BN_CLICKED(IDC_BUTTON_BROADCAST, &UDPPeerDialog::OnBroadcastButtonClicked)
@@ -113,7 +114,24 @@ BOOL UDPPeerDialog::OnInitDialog()
 	//1.2. 청자를 만들다. -서브 스레드 생성
 	//1.3. 청자에서 듣다. -서브 스레드 실행, 접속 받으면 메시지 박스 출력
 	//listenSocket에서 listen. ChatServerExample 참고
-	this->Listen();
+	//this->Listen();
+	//UDPPeerDialog* dlg = (UDPPeerDialog*)pParam;
+
+	if (this->listenSocket.Create(this->myPortno, SOCK_STREAM)) //소켓 생성(바인드되는 포트번호, TCP 소켓 플래그)
+	{
+		if (!this->listenSocket.Listen()) //서버가 클라이언트의 접속을 받을 수 있는 상태로 설정
+		{
+			AfxMessageBox(_T("ERROR: Listen() return FALSE"));
+		}
+		else {
+			AfxMessageBox(_T("I am Listening"));
+		}
+	}
+	else
+	{
+		DWORD error = GetLastError();
+		AfxMessageBox(_T("ERROR: Failed to create server socket!"));
+	}
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -167,21 +185,23 @@ HCURSOR UDPPeerDialog::OnQueryDragIcon()
 	return static_cast<HCURSOR>(this->m_hIcon);
 }
 
-void UDPPeerDialog::OnClose() {
+void UDPPeerDialog::OnDestroy() {
 	//5.1. 스레드를 모두 종료하다.
 	this->EndBroadcasting();
 
 	this->EndListening();
 
-	this->listenSocket.clientSocket->ShutDown();
-	this->listenSocket.clientSocket->Close();
-	this->listenSocket.ShutDown();
-	this->listenSocket.Close(); //서버 종료.
-
 	this->EndCollecting();
 
-	//5.2. 윈도우를 닫다.
-	CDialog::OnClose();
+	CDialog::OnDestroy();
+
+	if (this->listenSocket.clientSocket != NULL) {
+		this->listenSocket.clientSocket->ShutDown();
+		this->listenSocket.clientSocket->Close();
+		delete this->listenSocket.clientSocket;
+	}
+	this->listenSocket.ShutDown();
+	this->listenSocket.Close(); //서버 종료.
 }
 
 void UDPPeerDialog::OnBroadcastButtonClicked()
@@ -231,10 +251,10 @@ void UDPPeerDialog::OnConnectButtonClicked() {
 	this->EndCollecting();
 
 	this->connectSocket.Create();
-	if (this->connectSocket.Connect(this->ipAddress, this->portno) == FALSE)
+	if (this->connectSocket.Connect(this->ipAddress, this->otherPortno) == FALSE)
 	{
 		AfxMessageBox(_T("ERROR: Failed to connect server"));
-		PostQuitMessage(0);
+		//PostQuitMessage(0);
 	}
 	else {
 		AfxMessageBox(_T("Connect Success\r\nReady to Send Message"));
@@ -277,9 +297,6 @@ void UDPPeerDialog::EndBroadcasting() {
 UINT UDPPeerDialog::BroadcastThread(LPVOID pParam) {
 	UDPPeerDialog* dlg = (UDPPeerDialog*)pParam;
 
-	//@@@@@@@@@@@@@@@@@@@@@@@@@@@자기 포트번호 넣는 곳@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	int myPortNumber = 59765;
-	//@@@@@@@@@@@@@@@@@@@@@@@@@@@자기 포트번호 넣는 곳@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	int count = 0;
 	while (dlg->isBroadcasting == TRUE) {
 		WORD w = MAKEWORD(1, 1);
@@ -296,12 +313,12 @@ UINT UDPPeerDialog::BroadcastThread(LPVOID pParam) {
 		SOCKADDR_IN brdcastaddr;
 		memset(&brdcastaddr, 0, sizeof(brdcastaddr));
 		brdcastaddr.sin_family = AF_INET;
-		brdcastaddr.sin_port = htons(myPortNumber);
+		brdcastaddr.sin_port = htons(dlg->myPortno);
 		brdcastaddr.sin_addr.s_addr = INADDR_BROADCAST;
 		int len = sizeof(brdcastaddr);
 
 		char sbuf[1024];
-		sprintf(sbuf, "%d", myPortNumber);
+		sprintf(sbuf, "%d", dlg->myPortno);
 		int ret = sendto(dlg->broadcastSocket, sbuf, strlen(sbuf), 0, (sockaddr*)&brdcastaddr, len);
 		if (count <= 0) {
 			if (ret < 0)
@@ -315,7 +332,7 @@ UINT UDPPeerDialog::BroadcastThread(LPVOID pParam) {
 			else
 			{
 				CString msg;
-				msg.Format("Broadcasting is done by port %d", myPortNumber);
+				msg.Format("Broadcasting is done by port %d", dlg->myPortno);
 				AfxMessageBox(msg);
 			}
 		}
@@ -359,7 +376,7 @@ void UDPPeerDialog::EndListening() {
 UINT UDPPeerDialog::ListenThread(LPVOID pParam) {
 	UDPPeerDialog* dlg = (UDPPeerDialog*)pParam;
 
-	if (dlg->listenSocket.Create(dlg->portno, SOCK_STREAM)) //소켓 생성(바인드되는 포트번호, TCP 소켓 플래그)
+	if (dlg->listenSocket.Create(dlg->myPortno, SOCK_STREAM)) //소켓 생성(바인드되는 포트번호, TCP 소켓 플래그)
 	{
 		if (!dlg->listenSocket.Listen()) //서버가 클라이언트의 접속을 받을 수 있는 상태로 설정
 		{
@@ -419,7 +436,7 @@ UINT UDPPeerDialog::CollectThread(LPVOID pParam) {
 	if (dlg->collectSocket == -1)
 	{
 		dlg->MessageBox("Error in creating socket");
-		
+
 	}
 
 	//struct hostent *hostentry = gethostbyname(m_serveraddr);
@@ -429,7 +446,7 @@ UINT UDPPeerDialog::CollectThread(LPVOID pParam) {
 	SOCKADDR_IN UDPserveraddr;
 	memset(&UDPserveraddr, 0, sizeof(UDPserveraddr));
 	UDPserveraddr.sin_family = AF_INET;
-	UDPserveraddr.sin_port = htons(dlg->portno);
+	UDPserveraddr.sin_port = htons(dlg->otherPortno);
 	UDPserveraddr.sin_addr.s_addr = INADDR_ANY;
 
 	int len = sizeof(UDPserveraddr);
@@ -437,7 +454,7 @@ UINT UDPPeerDialog::CollectThread(LPVOID pParam) {
 	if (bind(dlg->collectSocket, (SOCKADDR*)&UDPserveraddr, sizeof(SOCKADDR_IN)) < 0)
 	{
 		dlg->MessageBox("ERROR binding in the server socket");
-		
+
 	}
 
 	while (dlg->isCollecting == TRUE) {
@@ -473,7 +490,7 @@ UINT UDPPeerDialog::CollectThread(LPVOID pParam) {
 
 				dlg->receiveData = rData + dlg->receiveData;
 				dlg->ipAddress = p;
-				dlg->portno = atoi(rbuf);
+				dlg->otherPortno = atoi(rbuf);
 
 				dlg->GetDlgItem(IDC_BUTTON_CONNECT)->EnableWindow(TRUE);
 			}

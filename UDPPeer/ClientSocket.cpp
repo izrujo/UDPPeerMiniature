@@ -36,10 +36,10 @@ void ClientSocket::OnReceive(int nErrorCode){
 
 		strTemp.Format(_T("[%s:%d] : %s"), strIPAddress, uPortNumber, buffer);
 		main->receiveData = strTemp + main->receiveData;
-		//main->UpdateData(FALSE);
+		main->UpdateData(FALSE);
 
-		/*ListenSocket* serverSocket = (ListenSocket*)this->listenSocket;
-		serverSocket->SendChatDataAll(buffer);*/
+		ListenSocket* serverSocket = (ListenSocket*)this->listenSocket;
+		serverSocket->SendChatDataAll(buffer);
 	}
 
 	CSocket::OnReceive(nErrorCode);

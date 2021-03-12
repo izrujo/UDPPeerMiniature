@@ -26,7 +26,7 @@ protected:
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
-	afx_msg void OnClose();
+	afx_msg void OnDestroy();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
@@ -68,7 +68,8 @@ public:
 	BOOL GetIsCollectPausing() const;
 
     CString receiveData;
-    int portno;
+    int otherPortno;
+	int myPortno;
     CEdit printEdit;
     afx_msg void OnCollectButtonClicked();
 

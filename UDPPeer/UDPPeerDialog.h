@@ -44,16 +44,6 @@ public:
     afx_msg void OnBroadcastButtonClicked();
 
     ListenSocket listenSocket;
-	CWinThread* listener;
-	BOOL isListening;
-	BOOL isListenPausing;
-	void Listen();
-	void PauseListening();
-	void ResumeListening();
-	void EndListening();
-	static UINT ListenThread(LPVOID pParam);
-	BOOL GetIsListening() const;
-	BOOL GetIsListenPausing() const;
 
 	SOCKET collectSocket;
 	CWinThread* collector;
@@ -86,13 +76,6 @@ inline BOOL UDPPeerDialog::GetIsBroadcasting() const {
 }
 inline BOOL UDPPeerDialog::GetIsBroadcastPausing() const {
 	return this->isBroadcastPausing;
-}
-
-inline BOOL UDPPeerDialog::GetIsListening() const {
-	return this->isListening;
-}
-inline BOOL UDPPeerDialog::GetIsListenPausing() const {
-	return this->isListenPausing;
 }
 
 inline BOOL UDPPeerDialog::GetIsCollecting() const {

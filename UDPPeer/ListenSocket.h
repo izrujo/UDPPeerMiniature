@@ -12,7 +12,7 @@ public:
 	//OnAccept - 서버가 접속을 기다리는 특정 포트로 클라이언트의 TCP 접속이 있을 때 자동으로 호출된다.
 	virtual void OnAccept(int nErrorCode);
 
-	void CloseClientSocket(CSocket* client);
+	void CloseClientSocket();
 	
 	void SendChatDataAll(TCHAR* message);
 

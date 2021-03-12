@@ -47,10 +47,6 @@ UDPPeerDialog::UDPPeerDialog(CWnd* pParent /*=NULL*/)
 	this->isBroadcasting = FALSE;
 	this->isBroadcastPausing = FALSE;
 
-	this->listener = NULL;
-	this->isListening = FALSE;
-	this->isListenPausing = FALSE;
-
 	this->collector = NULL;
 	this->isCollecting = FALSE;
 	this->isCollectPausing = FALSE;
@@ -113,10 +109,6 @@ BOOL UDPPeerDialog::OnInitDialog()
 
 	//1.2. 청자를 만들다. -서브 스레드 생성
 	//1.3. 청자에서 듣다. -서브 스레드 실행, 접속 받으면 메시지 박스 출력
-	//listenSocket에서 listen. ChatServerExample 참고
-	//this->Listen();
-	//UDPPeerDialog* dlg = (UDPPeerDialog*)pParam;
-
 	if (this->listenSocket.Create(this->myPortno, SOCK_STREAM)) //소켓 생성(바인드되는 포트번호, TCP 소켓 플래그)
 	{
 		if (!this->listenSocket.Listen()) //서버가 클라이언트의 접속을 받을 수 있는 상태로 설정
@@ -188,8 +180,6 @@ HCURSOR UDPPeerDialog::OnQueryDragIcon()
 void UDPPeerDialog::OnDestroy() {
 	//5.1. 스레드를 모두 종료하다.
 	this->EndBroadcasting();
-
-	this->EndListening();
 
 	this->EndCollecting();
 
@@ -339,59 +329,6 @@ UINT UDPPeerDialog::BroadcastThread(LPVOID pParam) {
 		::closesocket(dlg->broadcastSocket);
 		count++;
 	}
-
-	return 0;
-}
-
-void UDPPeerDialog::Listen() {
-	this->isListening = TRUE;
-
-	this->listener = AfxBeginThread(ListenThread, (LPVOID)this);
-}
-
-void UDPPeerDialog::PauseListening() {
-	this->isListening = FALSE;
-	this->isListenPausing = TRUE;
-	this->listener->SuspendThread();
-}
-
-void UDPPeerDialog::ResumeListening() {
-	this->isListening = TRUE;
-	this->isListenPausing = FALSE;
-	this->listener->ResumeThread();
-}
-
-void UDPPeerDialog::EndListening() {
-	this->isListening = FALSE;
-	if (this->listener != NULL) {
-		if (this->isListenPausing == TRUE) {
-			this->listener->ResumeThread();
-		}
-		::WaitForSingleObject(this->listener->m_hThread, INFINITE);
-
-	}
-	this->isListenPausing = FALSE;
-}
-
-UINT UDPPeerDialog::ListenThread(LPVOID pParam) {
-	UDPPeerDialog* dlg = (UDPPeerDialog*)pParam;
-
-	if (dlg->listenSocket.Create(dlg->myPortno, SOCK_STREAM)) //소켓 생성(바인드되는 포트번호, TCP 소켓 플래그)
-	{
-		if (!dlg->listenSocket.Listen()) //서버가 클라이언트의 접속을 받을 수 있는 상태로 설정
-		{
-			AfxMessageBox(_T("ERROR: Listen() return FALSE"));
-		}
-		else {
-			AfxMessageBox(_T("I am Listening"));
-		}
-	}
-	else
-	{
-		DWORD error = GetLastError();
-		AfxMessageBox(_T("ERROR: Failed to create server socket!"));
-	}
-
 
 	return 0;
 }

@@ -19,7 +19,7 @@ void ClientSocket::OnClose(int nErrorCode){
 	CSocket::OnClose(nErrorCode);
 
 	ListenSocket* serverSocket = (ListenSocket*)this->listenSocket;
-	serverSocket->CloseClientSocket(this);
+	serverSocket->CloseClientSocket();
 }
 
 void ClientSocket::OnReceive(int nErrorCode){

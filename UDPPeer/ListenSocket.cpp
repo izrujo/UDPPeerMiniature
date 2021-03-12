@@ -23,13 +23,13 @@ void ListenSocket::OnAccept(int nErrorCode) {
 	CAsyncSocket::OnAccept(nErrorCode);
 }
 
-void ListenSocket::CloseClientSocket(CSocket* client) {
-	if (client != NULL) {
-		client->ShutDown(); //통신 중지
-		client->Close(); //소켓 닫기
-		delete client; //삭제
+void ListenSocket::CloseClientSocket() {
+	if (this->clientSocket != NULL) {
+		this->clientSocket->ShutDown(); //통신 중지
+		this->clientSocket->Close(); //소켓 닫기
+		delete this->clientSocket; //삭제
+		this->clientSocket = NULL;
 	}
-
 }
 
 void ListenSocket::SendChatDataAll(TCHAR* message) {

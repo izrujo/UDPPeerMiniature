@@ -38,8 +38,8 @@ END_MESSAGE_MAP()
 UDPPeerDialog::UDPPeerDialog(CWnd* pParent /*=NULL*/)
 	: CDialog(IDD, pParent)
 	, receiveData(_T(""))
-	, otherPortno(49867)
-	, myPortno(63379)
+	, otherPortno(2180)
+	, myPortno(80)
 	, message(_T(""))
 	, ipAddress(_T(""))
 {
@@ -303,12 +303,14 @@ UINT UDPPeerDialog::BroadcastThread(LPVOID pParam) {
 		SOCKADDR_IN brdcastaddr;
 		memset(&brdcastaddr, 0, sizeof(brdcastaddr));
 		brdcastaddr.sin_family = AF_INET;
-		brdcastaddr.sin_port = htons(dlg->myPortno);
-		brdcastaddr.sin_addr.s_addr = INADDR_BROADCAST;
+		//brdcastaddr.sin_port = htons(dlg->otherPortno);
+		brdcastaddr.sin_port = 0;
+		//brdcastaddr.sin_addr.s_addr = INADDR_BROADCAST;
+		inet_pton(AF_INET, "39.123.25.167", &(brdcastaddr.sin_addr));
 		int len = sizeof(brdcastaddr);
 
 		char sbuf[1024];
-		sprintf(sbuf, "%d", dlg->myPortno);
+		sprintf(sbuf, "2180", dlg->myPortno);
 		int ret = sendto(dlg->broadcastSocket, sbuf, strlen(sbuf), 0, (sockaddr*)&brdcastaddr, len);
 		if (count <= 0) {
 			if (ret < 0)
@@ -336,7 +338,7 @@ UINT UDPPeerDialog::BroadcastThread(LPVOID pParam) {
 void UDPPeerDialog::Collect() {
 	this->isCollecting = TRUE;
 
-	this->UpdateData(TRUE);
+	//this->UpdateData(TRUE);
 	this->collector = AfxBeginThread(CollectThread, (LPVOID)this);
 }
 
@@ -383,13 +385,16 @@ UINT UDPPeerDialog::CollectThread(LPVOID pParam) {
 	SOCKADDR_IN UDPserveraddr;
 	memset(&UDPserveraddr, 0, sizeof(UDPserveraddr));
 	UDPserveraddr.sin_family = AF_INET;
-	UDPserveraddr.sin_port = htons(dlg->otherPortno);
+	//UDPserveraddr.sin_port = htons(dlg->myPortno);
+	UDPserveraddr.sin_port = 0;
 	UDPserveraddr.sin_addr.s_addr = INADDR_ANY;
+	//UDPserveraddr.sin_addr.s_addr = inet_addr("192.168.0.3");
 
 	int len = sizeof(UDPserveraddr);
 
 	if (bind(dlg->collectSocket, (SOCKADDR*)&UDPserveraddr, sizeof(SOCKADDR_IN)) < 0)
 	{
+		DWORD error = GetLastError();
 		dlg->MessageBox("ERROR binding in the server socket");
 
 	}
@@ -423,9 +428,9 @@ UINT UDPPeerDialog::CollectThread(LPVOID pParam) {
 				int serverportno = ntohs(clientaddr.sin_port);
 				CString rData;
 
-				rData.Format("%s\r\nBroadcast Server- %s: %d \r\n%s\r\n\r\n", (const char*)CTime::GetCurrentTime().Format("%B %d, %Y %H:%M:%S"), p, serverportno, rbuf);
+				//rData.Format("%s\r\nBroadcast Server- %s: %d \r\n%s\r\n\r\n", (const char*)CTime::GetCurrentTime().Format("%B %d, %Y %H:%M:%S"), p, serverportno, rbuf);
 
-				dlg->receiveData = rData + dlg->receiveData;
+				//dlg->receiveData = rData + dlg->receiveData;
 				dlg->ipAddress = p;
 				dlg->otherPortno = atoi(rbuf);
 
